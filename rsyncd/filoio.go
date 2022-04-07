@@ -102,7 +102,7 @@ func (ms *mapStruct) ptr(offset int64, l int32) []byte {
 		if err != nil {
 			ms.err = err
 			// TODO: zero the buffer, file has changed mid-transfer
-			log.Fatalf("file has changed mid-transfer")
+			log.Printf("file has changed mid-transfer")
 			break
 		}
 		ms.pFdOffset += int64(n)
