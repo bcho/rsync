@@ -1,8 +1,10 @@
 package rsyncd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 )
 
@@ -99,14 +101,23 @@ func (ms *mapStruct) ptr(offset int64, l int32) []byte {
 	//log.Printf("-> reading %d bytes from %d into buffer at offset=%d", readSize, readStart, readOffset)
 	for readSize > 0 {
 		n, err := ms.f.Read(ms.window[readOffset : readOffset+readSize])
-		if err != nil {
+		switch {
+		case errors.Is(err, io.EOF):
+			// EOF read in the middle, we're done
+			ms.pFdOffset += int64(n)
+			readOffset += int64(n)
+			readSize = 0
+			log.Printf("EOF read in the middle, breaking the loop for now")
+		case err == nil:
+			// no err
+			ms.pFdOffset += int64(n)
+			readOffset += int64(n)
+			readSize -= int64(n)
+		default:
+			// unknown error, panic for now
 			ms.err = err
-			// TODO: zero the buffer, file has changed mid-transfer
-			panic(fmt.Sprintf("file has changed mid-transfer: %s (readOffset=%d, readSize=%d)", err, readOffset, readSize))
+			panic(fmt.Sprintf("file %q has changed mid-transfer: %s (readOffset=%d, readSize=%d)", ms.f.Name(), err, readOffset, readSize))
 		}
-		ms.pFdOffset += int64(n)
-		readOffset += int64(n)
-		readSize -= int64(n)
 	}
 	return ms.window[alignFudge : alignFudge+len]
 }
